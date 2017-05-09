@@ -13,8 +13,8 @@ make
 sudo make check
 sudo make install
 
-Complie the code using the command 
+# Complie the code using the command 
 gcc i2c_atlas_sensor_data.c -o i2c_atlas_sensor_data -lbcm2835
 
-Execute command
+# Execute command
 sudo ./i2c_atlas_sensor_data 
