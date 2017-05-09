@@ -6,12 +6,12 @@ Install the bcm2835 Library
 
 # download the latest version of the library, bcm2835-1.52.tar.gz, then:
 ```c
-tar zxvf bcm2835-1.52.tar.gz <br>
-cd bcm2835-1.52 <br>
-./configure <br>
-make <br>
-sudo make check <br>
-sudo make install <br>
+tar zxvf bcm2835-1.52.tar.gz
+cd bcm2835-1.52
+./configure
+make
+sudo make check
+sudo make install
 ```
 # Complie the code using the command 
 ```c
