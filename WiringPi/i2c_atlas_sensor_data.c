@@ -1,3 +1,7 @@
+/*
+ * @author - Arsh Deep Singh Padda
+ * @version - 1.0, 5/23/2017
+ */
 #include<stdio.h>
 #include<stdlib.h>
 #include<wiringPiI2C.h>
@@ -9,17 +13,26 @@
 
 
 /*
- * The i2c address of the atlas sensor.
+ * The i2c address of the ph atlas sensor.
  */
-#define Addr_ph 0x63
-#define Addr_c 0x64
+
+
+#define Addr_ph_1 0x61
+#define Addr_ph_2 0x62
+#define Addr_ph_3 0x63
+/*
+ * The i2c address of the conductivity sensor.
+ */
+#define Addr_c_1 0x64
+#define Addr_c_2 0x65
+#define Addr_c_3 0x66
 
 
 /*
  * Define the delay between each read of a sensor.
  * Time is in milli second.
  */
-#define del 9200
+#define del 7600
 
 
 /*
@@ -54,7 +67,7 @@ struct read_write_arg{
  * Sets up the ph sensor on Channel 0
  * Returns the file handler.
  */
-static int set_I2C_channel_0(){
+static int set_I2C_channel_0(int Addr_ph){
 	return wiringPiI2CSetupInterface("/dev/i2c-0", Addr_ph);
 }
 
@@ -66,7 +79,7 @@ static int set_I2C_channel_0(){
  * Sets up the conductivity sensor on Channel 1
  * Returns the file handler.
  */
-static int set_I2C_channel_1(){
+static int set_I2C_channel_1(int Addr_c){
 	return wiringPiI2CSetupInterface("/dev/i2c-1", Addr_c);
 }
 
@@ -127,7 +140,7 @@ static void write_to_file_eol(FILE *fp){
 static void write_data_to_file(FILE *fp, char* buffer, char* time){
 	write_to_file(fp,time);
 	write_to_file_comma(fp);
-	write_to_file(fp,buffer);
+	write_to_file(fp,buffer+1);
 	write_to_file_eol(fp);
 }
 
@@ -135,7 +148,7 @@ static void write_data_to_file(FILE *fp, char* buffer, char* time){
  * The function first displays the value in the buffer, then writes the value to the file pointed by fp.
  * The function will display "Still Processing" if the first char of the buffer is a 254.
  */
-void display_write_to_file(char* buffer, FILE* fp){
+static void display_write_to_file(char* buffer, FILE* fp){
 	if(buffer[0] == 254){
 		printf("Still Processing \n\n");
 	}
@@ -155,7 +168,7 @@ void display_write_to_file(char* buffer, FILE* fp){
  * The multithreading function which writes a command to request data from the atlas sensor and then read the data and
  * puts it in the buffer. It then display the value and writes it to a file. 
  */
-void *read_write(void *arguments){
+static void *read_write(void *arguments){
 	struct read_write_arg *data = arguments;
 	write_data(data->channel);
 	delay(800);
@@ -164,16 +177,165 @@ void *read_write(void *arguments){
 }
 
 
+/*
+ * Perform the mid calibration of the atlas ph sensor.
+ */
+static void mid_calibration_ph(int channel){
+	printf("Performing Midpoint Calibration for ph \n Please use 7.00 ph for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	char dummy;
+	dummy = getchar();
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+	char set_cal[]="cal,mid,7.00";
+	write(channel, set_cal,12);
+	delay(300);
+}
+
+
+/*
+ * Perform the low calibration of the atlas ph sensor.
+ */
+static void low_calibration_ph(int channel){
+	printf("Performing Lowpoint Calibration for ph \n Please use 4.00 ph for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	char dummy;
+	dummy = getchar();
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+	char set_cal[]="cal,low,4.00";
+	write(channel, set_cal,12);
+	delay(300);
+}
+
+/*
+ * Perform the high calibration of the atlas ph sensor
+ */
+static void high_calibration_ph(int channel){
+	printf("Performing Highpoint Calibration for ph \n Please use 10.00 ph for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	char dummy;
+	dummy = getchar();
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+	char set_cal[]="cal,high,10.00";
+	write(channel, set_cal,13);
+	delay(300);
+}
+
+
+/*
+ * Perform the calibration of atlas ph sensor in the following order:
+ * Mid Calibration
+ * Low Calibration
+ * High Calibration
+ */
+static void calibration_ph(int channel){
+	mid_calibration_ph(channel);
+	low_calibration_ph(channel);
+	high_calibration_ph(channel);
+}
+
+
+/*
+ * Perform the mid calibration of the altas conductivity sensor.
+ */
+static void mid_calibration_c(int channel){
+	printf("Performing Midpoint Calibration for conductivity \n Please use 1413 for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	char dummy;
+	dummy = getchar();
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+	char set_cal[]="cal,1413";
+	write(channel, set_cal,8);
+	delay(300);
+}
+
+
+/*
+ * Perform the low calibration of the atlas conductivity sensor.
+ */
+static void low_calibration_c(int channel){
+	printf("Performing Lowpoint Calibration for conductivity \n Please use 12900 for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	char dummy;
+	dummy = getchar();
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+	char set_cal[]="cal,low,12900";
+	write(channel, set_cal,13);
+	delay(300);
+}
+
+
+/*
+ * Perform the high calibration of the atlas conductivity sensor.
+ */
+static void high_calibration_c(int channel){
+	printf("Performing Highpoint Calibration for conductivity \n Please use 50000 for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	char dummy;
+	dummy = getchar();
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+	char set_cal[]="cal,high,50000";
+	write(channel, set_cal,14);
+	delay(300);
+}
+
+
+/*
+ * Perform the calibration of the atlas conducitivity sensor in the following order:
+ * Mid Calibration
+ * Low Calibration
+ * High Calibration
+ */
+static void calibration_c(int channel){
+	mid_calibration_c(channel);
+	low_calibration_c(channel);
+	high_calibration_c(channel);
+}
+
+
 int main(){
 	//File handler that will be used to read data and write command to the atlas sensor.
-	int channel0 = set_I2C_channel_0();
-	int channel1 = set_I2C_channel_1();
-
+	int channel0_ph1 = set_I2C_channel_0(Addr_ph_1);
+	int channel0_ph2 = set_I2C_channel_0(Addr_ph_2);
+	int channel0_ph3 = set_I2C_channel_0(Addr_ph_3);
+	int channel1_c1 = set_I2C_channel_1(Addr_c_1);
+	int channel1_c2 = set_I2C_channel_1(Addr_c_2);
+	int channel1_c3 = set_I2C_channel_1(Addr_c_3);
 	//If channel 0 or channel 1 is -ve then there is an issue with the connection or you are not running as root (Use sudo before execution
-	//of the executable). 
-	if(channel0 < 0 || channel1 < 0){
-		printf("error : failed connection with the I2C channel \n");
+	//of the executable).
+	if(channel0_ph1 < 0 || channel0_ph2 < 0 || channel0_ph3 < 0){
+		printf("error : failed connection with the I2C channel 0. \n");
 		return;
+	}
+
+	if(channel1_c1 < 0 || channel1_c2 < 0 || channel1_c3 < 0){
+		printf("error : failed connection with the I2C channel 1. \n");
+	}
+
+	//Perform the check for calibration.
+	char dummy;
+	printf("Do you want to perform calibration of all sensors? \n Press y for Yes or n for No.\n Then press Enter\n");
+	scanf(" %c",&dummy);
+	getchar();
+	printf("\n");
+	if(dummy == 'y' || dummy == 'Y'){
+		printf("****** Calibration for ph sensor 1****** \n");
+		calibration_ph(channel0_ph1);
+		printf("****** Calibration for ph sensor 2****** \n");
+		calibration_ph(channel0_ph2);
+		printf("****** Calibration for ph sensor 3****** \n");
+		calibration_ph(channel0_ph3);
+		printf("****** Calibration for conductivity sensor 1 ******\n");
+		calibration_ph(channel1_c1);
+		printf("****** Calibration for conductivity sensor 2 ******\n");
+		calibration_ph(channel1_c2);
+		printf("****** Calibration for conductivity sensor 3 ******\n");
+		calibration_ph(channel1_c3);
 	}
 
 	printf("Creating buffer for data input\n");
@@ -195,15 +357,43 @@ int main(){
 	FILE* fp_c;
 
 	//Try to create a file with write permission to store ph values.
-	fp_ph = fopen("data_ph.csv","w");
+	char ph_str[] = "data_ph.csv";
+	char c_str[] = "data_c.csv ";
+/*
+	char *temp_time;
+
+	//Add time stamp to file
+	time(&t);
+	temp_time = (char*)calloc(32, sizeof(char));
+	temp_time = ctime(&t);
+	int index = strlen(temp_time);
+	temp_time[index - 1] = '\0';
+
+	//Concatenate the time stamp to string and make a .csv format file.
+	strcat(ph_str, temp_time);
+	strcat(ph_str,".csv");
+*/
+	//Try to create a file and open it.
+	fp_ph = fopen(ph_str,"a");
 
 	if(fp_ph == NULL){
 		printf("Couldn't open file ph\n");
 		return;
 	}
+/*
+	//Add time stamp to file
+	time(&t);
+	temp_time = (char*)calloc(32, sizeof(char));
+	temp_time = ctime(&t);
+	index = strlen(temp_time);
+	temp_time[index - 1] = '\0';
 
-	//Try to create a file with write permission to store conductivity values
-	fp_c = fopen("data_c.csv","w");
+	//Concatenate the time stamp to string and make a .csv format file.
+	strcat(c_str, temp_time);
+	strcat(c_str,".csv");
+*/
+	//Try to create a file and open it.
+	fp_c = fopen(c_str,"a");
 
 	if(fp_c == NULL){
 		printf("Couldn't open file c\n");
@@ -216,17 +406,28 @@ int main(){
 
 	//Create the structure to pass the data for ph in multithreading.
 	struct read_write_arg ph_data;
-	ph_data.channel = channel0;
+	//ph_data.channel = channel0_ph1;
 	ph_data.buffer = buffer_ph;
 	ph_data.fp = fp_ph;
 
 	//Create the structure to pass the data for conductivity in multithreading.
 	struct read_write_arg c_data;
-	c_data.channel = channel1;
+	//c_data.channel = channel1_c1;
 	c_data.buffer = buffer_c;
 	c_data.fp = fp_c;
 
-	for(i=0;i<5;i++){
+	//Time to keep track of the time for which it records.
+	time_t end_time;
+	time_t start_time = time(NULL);
+	time_t seconds= 100;
+	end_time = start_time + seconds;
+	printf("Data Collection starts at time %s",ctime(&start_time));
+
+	while(start_time < end_time){
+	//Reading Pair 1
+	ph_data.channel = channel0_ph1;
+	c_data.channel = channel1_c1;
+
 	//Create the thread and run them.
 	pthread_create(&thread_ph, NULL, &read_write,(void *)&ph_data);
 	pthread_create(&thread_c, NULL, &read_write,(void *)&c_data);
@@ -235,10 +436,39 @@ int main(){
 	pthread_join(thread_ph, NULL);
 	pthread_join(thread_c, NULL);
 
+	//Reading Pair 2
+	ph_data.channel = channel0_ph2;
+	c_data.channel = channel1_c2;
+
+	//Create the thread and run them.
+	pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
+	pthread_create(&thread_c, NULL, &read_write, (void *)&c_data);
+
+	//Wait for the thread to finish.
+	pthread_join(thread_ph, NULL);
+	pthread_join(thread_c, NULL);
+
+	//Reading the Pair 3
+	ph_data.channel = channel0_ph3;
+	c_data.channel = channel1_c3;
+
+	//Create the thread and run them.
+	pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
+	pthread_create(&thread_c, NULL, &read_write, (void *)&c_data);
+
+	//Wait for the thread to finish.
+	pthread_join(thread_ph, NULL);
+	pthread_join(thread_c, NULL);
+
 	printf("\n");
 
-	delay(del);
-	}
+	//Update the time.
+	start_time = time(NULL);
 
+	//Delay between the readings.
+	delay(del);
+
+	}
+	printf("Data collection ends at time %s",ctime(&start_time));
 return 0;
 }
