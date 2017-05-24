@@ -358,7 +358,7 @@ int main(){
 
 	//Try to create a file with write permission to store ph values.
 	char ph_str[] = "data_ph.csv";
-	char c_str[] = "data_c.csv ";
+	char c_str[] = "data_c.csv";
 /*
 	char *temp_time;
 
@@ -470,5 +470,6 @@ int main(){
 
 	}
 	printf("Data collection ends at time %s",ctime(&start_time));
+	system("sudo bash /home/pi/Dropbox-Uploader/dropbox_uploader.sh upload /home/pi/Desktop/New/ /");
 return 0;
 }
