@@ -2,15 +2,17 @@
  * @author - Arsh Deep Singh Padda
  * @version - 1.0, 5/23/2017
  */
-#include<stdio.h>
-#include<stdlib.h>
-#include<wiringPiI2C.h>
-#include<time.h>
-#include<stdint.h>
-#include<fcntl.h>
-#include<pthread.h>
-#include<string.h>
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <wiringPiI2C.h>
+#include <time.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <string.h>
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 /*
  * The i2c address of the ph atlas sensor.
@@ -57,6 +59,7 @@ struct read_write_arg{
 	int channel;
 	char* buffer;
 	FILE* fp;
+	int counter;
 };
 
 
@@ -137,18 +140,26 @@ static void write_to_file_eol(FILE *fp){
 /*
  * Write the data, then the comma, then time stamp to the file nad finally the end of line.
  */
-static void write_data_to_file(FILE *fp, char* buffer, char* time){
-	write_to_file(fp,time);
-	write_to_file_comma(fp);
-	write_to_file(fp,buffer+1);
-	write_to_file_eol(fp);
+static void write_data_to_file(FILE *fp, char* buffer, char* time, int counter){
+	if(counter == 1){
+		write_to_file(fp,time);
+		write_to_file_comma(fp);
+	}
+	if(counter == 3){
+		write_to_file(fp,buffer+1);
+		write_to_file_eol(fp);
+	}
+	else{
+		write_to_file(fp,buffer+1);
+		write_to_file_comma(fp);
+	}
 }
 
 /*
  * The function first displays the value in the buffer, then writes the value to the file pointed by fp.
  * The function will display "Still Processing" if the first char of the buffer is a 254.
  */
-static void display_write_to_file(char* buffer, FILE* fp){
+static void display_write_to_file(char* buffer, FILE* fp, int counter){
 	if(buffer[0] == 254){
 		printf("Still Processing \n\n");
 	}
@@ -158,7 +169,7 @@ static void display_write_to_file(char* buffer, FILE* fp){
 		current_time[index-1] = '\0';
 		printf("value @ %s : ",current_time);
 		printf("%s", buffer);
-		write_data_to_file(fp,buffer,current_time);
+		write_data_to_file(fp,buffer,current_time,counter);
 		printf("\n");
 	}
 }
@@ -173,7 +184,7 @@ static void *read_write(void *arguments){
 	write_data(data->channel);
 	delay(800);
 	read_data(data->channel, data->buffer);
-	display_write_to_file(data->buffer, data->fp);
+	display_write_to_file(data->buffer, data->fp, data->counter);
 }
 
 
@@ -181,12 +192,20 @@ static void *read_write(void *arguments){
  * Perform the mid calibration of the atlas ph sensor.
  */
 static void mid_calibration_ph(int channel){
-	printf("Performing Midpoint Calibration for ph \n Please use 7.00 ph for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	printf(" Performing Midpoint Calibration for ph \n Please use 7.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	char clear_data[] = "cal,clear";
 	write(channel, clear_data, 10);
 	delay(1000);
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
 	char set_cal[]="cal,mid,7.00";
 	write(channel, set_cal,12);
 	delay(300);
@@ -197,12 +216,20 @@ static void mid_calibration_ph(int channel){
  * Perform the low calibration of the atlas ph sensor.
  */
 static void low_calibration_ph(int channel){
-	printf("Performing Lowpoint Calibration for ph \n Please use 4.00 ph for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	printf(" Performing Lowpoint Calibration for ph \n Please use 4.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	char clear_data[] = "cal,clear";
 	write(channel, clear_data, 10);
 	delay(1000);
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
 	char set_cal[]="cal,low,4.00";
 	write(channel, set_cal,12);
 	delay(300);
@@ -212,12 +239,20 @@ static void low_calibration_ph(int channel){
  * Perform the high calibration of the atlas ph sensor
  */
 static void high_calibration_ph(int channel){
-	printf("Performing Highpoint Calibration for ph \n Please use 10.00 ph for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	printf(" Performing Highpoint Calibration for ph \n Please use 10.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	char clear_data[] = "cal,clear";
 	write(channel, clear_data, 10);
 	delay(1000);
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
 	char set_cal[]="cal,high,10.00";
 	write(channel, set_cal,13);
 	delay(300);
@@ -241,12 +276,20 @@ static void calibration_ph(int channel){
  * Perform the mid calibration of the altas conductivity sensor.
  */
 static void mid_calibration_c(int channel){
-	printf("Performing Midpoint Calibration for conductivity \n Please use 1413 for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	printf(" Performing Midpoint Calibration for conductivity \n Please use 1413 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	char clear_data[] = "cal,clear";
 	write(channel, clear_data, 10);
 	delay(1000);
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
 	char set_cal[]="cal,1413";
 	write(channel, set_cal,8);
 	delay(300);
@@ -257,12 +300,20 @@ static void mid_calibration_c(int channel){
  * Perform the low calibration of the atlas conductivity sensor.
  */
 static void low_calibration_c(int channel){
-	printf("Performing Lowpoint Calibration for conductivity \n Please use 12900 for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	printf(" Performing Lowpoint Calibration for conductivity \n Please use 12900 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	char clear_data[] = "cal,clear";
 	write(channel, clear_data, 10);
 	delay(1000);
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
 	char set_cal[]="cal,low,12900";
 	write(channel, set_cal,13);
 	delay(300);
@@ -273,12 +324,20 @@ static void low_calibration_c(int channel){
  * Perform the high calibration of the atlas conductivity sensor.
  */
 static void high_calibration_c(int channel){
-	printf("Performing Highpoint Calibration for conductivity \n Please use 50000 for calibration. \n Wait for 1-2 minute before pressing enter to continue.\n ");
+	printf(" Performing Highpoint Calibration for conductivity \n Please use 50000 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	char clear_data[] = "cal,clear";
 	write(channel, clear_data, 10);
 	delay(1000);
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
 	char set_cal[]="cal,high,50000";
 	write(channel, set_cal,14);
 	delay(300);
@@ -295,6 +354,37 @@ static void calibration_c(int channel){
 	mid_calibration_c(channel);
 	low_calibration_c(channel);
 	high_calibration_c(channel);
+}
+
+
+/*
+ * Used to get a keyboard interaction.
+ * Returns a 1 if keyboard interaction is true i.e. 1 else returns a false i.e. 0.
+ * Used to exit out the loop while calibration process.
+ */
+static int kbhit(void){
+	struct termios oldt, newt;
+  	int ch;
+  	int oldf;
+
+	tcgetattr(STDIN_FILENO, &oldt);
+ 	newt = oldt;
+  	newt.c_lflag &= ~(ICANON | ECHO);
+  	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+  	oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+  	fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+  	ch = getchar();
+
+  	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+  	fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+  	if(ch != EOF){
+    		ungetc(ch, stdin);
+    		return 1;
+  	}
+
+  	return 0;
 }
 
 
@@ -331,11 +421,11 @@ int main(){
 		printf("****** Calibration for ph sensor 3****** \n");
 		calibration_ph(channel0_ph3);
 		printf("****** Calibration for conductivity sensor 1 ******\n");
-		calibration_ph(channel1_c1);
+		calibration_c(channel1_c1);
 		printf("****** Calibration for conductivity sensor 2 ******\n");
-		calibration_ph(channel1_c2);
+		calibration_c(channel1_c2);
 		printf("****** Calibration for conductivity sensor 3 ******\n");
-		calibration_ph(channel1_c3);
+		calibration_c(channel1_c3);
 	}
 
 	printf("Creating buffer for data input\n");
@@ -426,7 +516,9 @@ int main(){
 	while(start_time < end_time){
 	//Reading Pair 1
 	ph_data.channel = channel0_ph1;
+	ph_data.counter = 1;
 	c_data.channel = channel1_c1;
+	c_data.counter = 1;
 
 	//Create the thread and run them.
 	pthread_create(&thread_ph, NULL, &read_write,(void *)&ph_data);
@@ -438,7 +530,9 @@ int main(){
 
 	//Reading Pair 2
 	ph_data.channel = channel0_ph2;
+	ph_data.counter = 2;
 	c_data.channel = channel1_c2;
+	c_data.counter = 2;
 
 	//Create the thread and run them.
 	pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
@@ -450,7 +544,9 @@ int main(){
 
 	//Reading the Pair 3
 	ph_data.channel = channel0_ph3;
+	ph_data.counter = 3;
 	c_data.channel = channel1_c3;
+	c_data.counter = 3;
 
 	//Create the thread and run them.
 	pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
@@ -470,6 +566,8 @@ int main(){
 
 	}
 	printf("Data collection ends at time %s",ctime(&start_time));
+	//Data Backup
+	printf("Performing Data Backup in DropBox. \n");
 	system("sudo bash /home/pi/Dropbox-Uploader/dropbox_uploader.sh upload /home/pi/Desktop/New/ /");
 return 0;
 }
