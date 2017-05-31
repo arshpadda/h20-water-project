@@ -2,6 +2,8 @@
  * @author - Arsh Deep Singh Padda
  * @version - 1.0, 5/23/2017
  */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <wiringPiI2C.h>
@@ -14,14 +16,15 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+
 /*
  * The i2c address of the ph atlas sensor.
  */
-
-
 #define Addr_ph_1 0x61
 #define Addr_ph_2 0x62
 #define Addr_ph_3 0x63
+
+
 /*
  * The i2c address of the conductivity sensor.
  */
@@ -54,6 +57,7 @@ static char* current_time;
  * channel is the file handler for the device which is used to access the atlas sensor.
  * buffer is the pointer to the string which will hold the data from the atlas senor.
  * fp is the file handler to the file in which data will be written.
+ * counter is the atlas sensor from which the value is taken.
  */
 struct read_write_arg{
 	int channel;
@@ -155,6 +159,7 @@ static void write_data_to_file(FILE *fp, char* buffer, char* time, int counter){
 	}
 }
 
+
 /*
  * The function first displays the value in the buffer, then writes the value to the file pointed by fp.
  * The function will display "Still Processing" if the first char of the buffer is a 254.
@@ -189,175 +194,6 @@ static void *read_write(void *arguments){
 
 
 /*
- * Perform the mid calibration of the atlas ph sensor.
- */
-static void mid_calibration_ph(int channel){
-	printf(" Performing Midpoint Calibration for ph \n Please use 7.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
-	delay(1000);
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,mid,7.00";
-	write(channel, set_cal,12);
-	delay(300);
-}
-
-
-/*
- * Perform the low calibration of the atlas ph sensor.
- */
-static void low_calibration_ph(int channel){
-	printf(" Performing Lowpoint Calibration for ph \n Please use 4.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
-	delay(1000);
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,low,4.00";
-	write(channel, set_cal,12);
-	delay(300);
-}
-
-/*
- * Perform the high calibration of the atlas ph sensor
- */
-static void high_calibration_ph(int channel){
-	printf(" Performing Highpoint Calibration for ph \n Please use 10.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
-	delay(1000);
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,high,10.00";
-	write(channel, set_cal,13);
-	delay(300);
-}
-
-
-/*
- * Perform the calibration of atlas ph sensor in the following order:
- * Mid Calibration
- * Low Calibration
- * High Calibration
- */
-static void calibration_ph(int channel){
-	mid_calibration_ph(channel);
-	low_calibration_ph(channel);
-	high_calibration_ph(channel);
-}
-
-
-/*
- * Perform the mid calibration of the altas conductivity sensor.
- */
-static void mid_calibration_c(int channel){
-	printf(" Performing Midpoint Calibration for conductivity \n Please use 1413 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
-	delay(1000);
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,1413";
-	write(channel, set_cal,8);
-	delay(300);
-}
-
-
-/*
- * Perform the low calibration of the atlas conductivity sensor.
- */
-static void low_calibration_c(int channel){
-	printf(" Performing Lowpoint Calibration for conductivity \n Please use 12900 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
-	delay(1000);
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,low,12900";
-	write(channel, set_cal,13);
-	delay(300);
-}
-
-
-/*
- * Perform the high calibration of the atlas conductivity sensor.
- */
-static void high_calibration_c(int channel){
-	printf(" Performing Highpoint Calibration for conductivity \n Please use 50000 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
-	delay(1000);
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,high,50000";
-	write(channel, set_cal,14);
-	delay(300);
-}
-
-
-/*
- * Perform the calibration of the atlas conducitivity sensor in the following order:
- * Mid Calibration
- * Low Calibration
- * High Calibration
- */
-static void calibration_c(int channel){
-	mid_calibration_c(channel);
-	low_calibration_c(channel);
-	high_calibration_c(channel);
-}
-
-
-/*
  * Used to get a keyboard interaction.
  * Returns a 1 if keyboard interaction is true i.e. 1 else returns a false i.e. 0.
  * Used to exit out the loop while calibration process.
@@ -385,6 +221,170 @@ static int kbhit(void){
   	}
 
   	return 0;
+}
+
+
+/*
+ * Used to clear sensor of previous calibration.
+ */
+static void clear_sensor(int channel){
+	char clear_data[] = "cal,clear";
+	write(channel, clear_data, 10);
+	delay(1000);
+}
+
+
+/*
+ * Perform the mid calibration of the atlas ph sensor.
+ */
+static void mid_calibration_ph(int channel){
+	printf(" Performing Midpoint Calibration for ph \n Please use 7.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,mid,7.00";
+	write(channel, set_cal,12);
+	delay(300);
+}
+
+
+/*
+ * Perform the low calibration of the atlas ph sensor.
+ */
+static void low_calibration_ph(int channel){
+	printf(" Performing Lowpoint Calibration for ph \n Please use 4.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,low,4.00";
+	write(channel, set_cal,12);
+	delay(300);
+}
+
+
+/*
+ * Perform the high calibration of the atlas ph sensor
+ */
+static void high_calibration_ph(int channel){
+	printf(" Performing Highpoint Calibration for ph \n Please use 10.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,high,10.00";
+	write(channel, set_cal,13);
+	delay(300);
+}
+
+
+/*
+ * Perform the calibration of atlas ph sensor in the following order:
+ * Mid Calibration
+ * Low Calibration
+ * High Calibration
+ */
+static void calibration_ph(int channel){
+	clear_sensor(channel);
+	mid_calibration_ph(channel);
+	low_calibration_ph(channel);
+	high_calibration_ph(channel);
+}
+
+
+/*
+ * Perform the mid calibration of the altas conductivity sensor.
+ */
+static void mid_calibration_c(int channel){
+	printf(" Performing Midpoint Calibration for conductivity \n Please use 1413 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,1413";
+	write(channel, set_cal,8);
+	delay(300);
+}
+
+
+/*
+ * Perform the low calibration of the atlas conductivity sensor.
+ */
+static void low_calibration_c(int channel){
+	printf(" Performing Lowpoint Calibration for conductivity \n Please use 1413 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,low,1413";
+	write(channel, set_cal,12);
+	delay(300);
+}
+
+
+/*
+ * Perform the high calibration of the atlas conductivity sensor.
+ */
+static void high_calibration_c(int channel){
+	printf(" Performing Highpoint Calibration for conductivity \n Please use 12900 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,high,12900";
+	write(channel, set_cal,14);
+	delay(300);
+}
+
+
+/*
+ * Perform the calibration of the atlas conducitivity sensor in the following order:
+ * Mid Calibration
+ * Low Calibration
+ * High Calibration
+ */
+static void calibration_c(int channel){
+	clear_sensor(channel);
+	//mid_calibration_c(channel);
+	low_calibration_c(channel);
+	high_calibration_c(channel);
 }
 
 
@@ -427,6 +427,11 @@ int main(){
 		printf("****** Calibration for conductivity sensor 3 ******\n");
 		calibration_c(channel1_c3);
 	}
+
+	printf("\nPress Enter to start data collection. \n");
+	while(!kbhit()){
+	}
+	getchar();
 
 	printf("Creating buffer for data input\n");
 	//Create pointer to the buffer that will hold the data returned from the atlas sensor. 
