@@ -229,7 +229,7 @@ static int kbhit(void){
  */
 static void clear_sensor(int channel){
 	char clear_data[] = "cal,clear";
-	write(channel, clear_data, 10);
+	write(channel, clear_data, 9);
 	delay(1000);
 }
 
@@ -299,6 +299,7 @@ static void high_calibration_ph(int channel){
 
 /*
  * Perform the calibration of atlas ph sensor in the following order:
+ * Clear Sensor
  * Mid Calibration
  * Low Calibration
  * High Calibration
@@ -308,6 +309,27 @@ static void calibration_ph(int channel){
 	mid_calibration_ph(channel);
 	low_calibration_ph(channel);
 	high_calibration_ph(channel);
+}
+
+
+/*
+ * Perform the dry calibration of the atlas conductivity sensor.
+ */
+static void dry_calibration_c(int channel){
+	printf(" Performing Dry Calibration for conductivity. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	char dummy;
+	dummy = getchar();
+	while(!kbhit()){
+		write_data(channel);
+		delay(800);
+		char *buffer = (char*)calloc(32, sizeof(char));
+		read_data(channel,buffer);
+		printf("%s \n", buffer);
+	}
+	dummy = getchar();
+	char set_cal[]="cal,dry";
+	write(channel, set_cal,7);
+	delay(800);
 }
 
 
@@ -328,7 +350,7 @@ static void mid_calibration_c(int channel){
 	dummy = getchar();
 	char set_cal[]="cal,1413";
 	write(channel, set_cal,8);
-	delay(300);
+	delay(800);
 }
 
 
@@ -349,7 +371,7 @@ static void low_calibration_c(int channel){
 	dummy = getchar();
 	char set_cal[]="cal,low,1413";
 	write(channel, set_cal,12);
-	delay(300);
+	delay(800);
 }
 
 
@@ -370,18 +392,21 @@ static void high_calibration_c(int channel){
 	dummy = getchar();
 	char set_cal[]="cal,high,12900";
 	write(channel, set_cal,14);
-	delay(300);
+	delay(800);
 }
 
 
 /*
  * Perform the calibration of the atlas conducitivity sensor in the following order:
+ * Clear Sensor
+ * Dry Calibration
  * Mid Calibration
  * Low Calibration
  * High Calibration
  */
 static void calibration_c(int channel){
 	clear_sensor(channel);
+	//dry_calibration_c(channel);
 	//mid_calibration_c(channel);
 	low_calibration_c(channel);
 	high_calibration_c(channel);
