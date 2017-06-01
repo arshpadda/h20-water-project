@@ -37,7 +37,7 @@
  * Define the delay between each read of a sensor.
  * Time is in milli second.
  */
-#define del 7600
+#define del 57600
 
 
 /*
@@ -334,31 +334,10 @@ static void dry_calibration_c(int channel){
 
 
 /*
- * Perform the mid calibration of the altas conductivity sensor.
- */
-static void mid_calibration_c(int channel){
-	printf(" Performing Midpoint Calibration for conductivity \n Please use 1413 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
-	while(!kbhit()){
-		write_data(channel);
-		delay(800);
-		char *buffer = (char*)calloc(32, sizeof(char));
-		read_data(channel,buffer);
-		printf("%s \n", buffer);
-	}
-	dummy = getchar();
-	char set_cal[]="cal,1413";
-	write(channel, set_cal,8);
-	delay(800);
-}
-
-
-/*
  * Perform the low calibration of the atlas conductivity sensor.
  */
 static void low_calibration_c(int channel){
-	printf(" Performing Lowpoint Calibration for conductivity \n Please use 1413 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	printf(" Performing Lowpoint Calibration for conductivity \n Please use 12900 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	while(!kbhit()){
@@ -369,8 +348,8 @@ static void low_calibration_c(int channel){
 		printf("%s \n", buffer);
 	}
 	dummy = getchar();
-	char set_cal[]="cal,low,1413";
-	write(channel, set_cal,12);
+	char set_cal[]="cal,low,12900";
+	write(channel, set_cal,13);
 	delay(800);
 }
 
@@ -379,7 +358,7 @@ static void low_calibration_c(int channel){
  * Perform the high calibration of the atlas conductivity sensor.
  */
 static void high_calibration_c(int channel){
-	printf(" Performing Highpoint Calibration for conductivity \n Please use 12900 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
+	printf(" Performing Highpoint Calibration for conductivity \n Please use 50000 for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
 	char dummy;
 	dummy = getchar();
 	while(!kbhit()){
@@ -390,7 +369,7 @@ static void high_calibration_c(int channel){
 		printf("%s \n", buffer);
 	}
 	dummy = getchar();
-	char set_cal[]="cal,high,12900";
+	char set_cal[]="cal,high,50000";
 	write(channel, set_cal,14);
 	delay(800);
 }
@@ -400,14 +379,12 @@ static void high_calibration_c(int channel){
  * Perform the calibration of the atlas conducitivity sensor in the following order:
  * Clear Sensor
  * Dry Calibration
- * Mid Calibration
  * Low Calibration
  * High Calibration
  */
 static void calibration_c(int channel){
 	clear_sensor(channel);
-	//dry_calibration_c(channel);
-	//mid_calibration_c(channel);
+	dry_calibration_c(channel);
 	low_calibration_c(channel);
 	high_calibration_c(channel);
 }
@@ -415,6 +392,7 @@ static void calibration_c(int channel){
 
 int main(){
 	//File handler that will be used to read data and write command to the atlas sensor.
+
 	int channel0_ph1 = set_I2C_channel_0(Addr_ph_1);
 	int channel0_ph2 = set_I2C_channel_0(Addr_ph_2);
 	int channel0_ph3 = set_I2C_channel_0(Addr_ph_3);
@@ -439,18 +417,22 @@ int main(){
 	getchar();
 	printf("\n");
 	if(dummy == 'y' || dummy == 'Y'){
+/*
 		printf("****** Calibration for ph sensor 1****** \n");
 		calibration_ph(channel0_ph1);
 		printf("****** Calibration for ph sensor 2****** \n");
 		calibration_ph(channel0_ph2);
 		printf("****** Calibration for ph sensor 3****** \n");
 		calibration_ph(channel0_ph3);
+*/
 		printf("****** Calibration for conductivity sensor 1 ******\n");
 		calibration_c(channel1_c1);
+/*
 		printf("****** Calibration for conductivity sensor 2 ******\n");
 		calibration_c(channel1_c2);
 		printf("****** Calibration for conductivity sensor 3 ******\n");
 		calibration_c(channel1_c3);
+*/
 	}
 
 	printf("\nPress Enter to start data collection. \n");
@@ -539,7 +521,8 @@ int main(){
 	//Time to keep track of the time for which it records.
 	time_t end_time;
 	time_t start_time = time(NULL);
-	time_t seconds= 100;
+	//4 hours = 4 * 60 min = 4 * 60 * 60 seconds = 14400 seconds.
+	time_t seconds= 14400;
 	end_time = start_time + seconds;
 	printf("Data Collection starts at time %s",ctime(&start_time));
 
