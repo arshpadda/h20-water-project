@@ -1,6 +1,6 @@
 /*
  * @author - Arsh Deep Singh Padda
- * @version - 1.0, 5/23/2017
+ * @version - 1.0, 6/1/2017
  */
 
 
@@ -417,22 +417,18 @@ int main(){
 	getchar();
 	printf("\n");
 	if(dummy == 'y' || dummy == 'Y'){
-/*
 		printf("****** Calibration for ph sensor 1****** \n");
 		calibration_ph(channel0_ph1);
 		printf("****** Calibration for ph sensor 2****** \n");
 		calibration_ph(channel0_ph2);
 		printf("****** Calibration for ph sensor 3****** \n");
 		calibration_ph(channel0_ph3);
-*/
 		printf("****** Calibration for conductivity sensor 1 ******\n");
 		calibration_c(channel1_c1);
-/*
 		printf("****** Calibration for conductivity sensor 2 ******\n");
 		calibration_c(channel1_c2);
 		printf("****** Calibration for conductivity sensor 3 ******\n");
 		calibration_c(channel1_c3);
-*/
 	}
 
 	printf("\nPress Enter to start data collection. \n");
