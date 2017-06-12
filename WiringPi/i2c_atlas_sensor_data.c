@@ -1,6 +1,6 @@
 /*
  * @author - Arsh Deep Singh Padda
- * @version - 1.0, 6/1/2017
+ * @version - 1.0, 6/12/2017
  */
 
 
@@ -57,12 +57,14 @@ static char* current_time;
  * channel is the file handler for the device which is used to access the atlas sensor.
  * buffer is the pointer to the string which will hold the data from the atlas senor.
  * fp is the file handler to the file in which data will be written.
+ * type is to identify whether the arguments belong to ph or conductivity.
  * counter is the atlas sensor from which the value is taken.
  */
 struct read_write_arg{
 	int channel;
 	char* buffer;
 	FILE* fp;
+	char type;
 	int counter;
 };
 
@@ -109,15 +111,6 @@ static void read_data(int channel,char *buffer){
 
 
 /*
- * Returns the system clock time. Used for time stamp.
- */
-static char* getCurrentTime(){
-	time(&t);
-	return ctime(&t);
-}
-
-
-/*
  * Writes the given string to the file pointed by the file pointer.
  */
 static void write_to_file(FILE *fp, char* str){
@@ -145,10 +138,12 @@ static void write_to_file_eol(FILE *fp){
  * Write the data, then the comma, then time stamp to the file nad finally the end of line.
  */
 static void write_data_to_file(FILE *fp, char* buffer, char* time, int counter){
+	//If the counter value is equal to one then we need to write the time as it is the first value in the new row.
 	if(counter == 1){
 		write_to_file(fp,time);
 		write_to_file_comma(fp);
 	}
+	//If the counter value is equal to three then we need to write the end of file as it is the last value in the current row.
 	if(counter == 3){
 		write_to_file(fp,buffer+1);
 		write_to_file_eol(fp);
@@ -164,17 +159,35 @@ static void write_data_to_file(FILE *fp, char* buffer, char* time, int counter){
  * The function first displays the value in the buffer, then writes the value to the file pointed by fp.
  * The function will display "Still Processing" if the first char of the buffer is a 254.
  */
-static void display_write_to_file(char* buffer, FILE* fp, int counter){
+static void display_write_to_file(char* buffer, FILE* fp, int counter,char type){
 	if(buffer[0] == 254){
 		printf("Still Processing \n\n");
 	}
 	else{
-		current_time = getCurrentTime();
-		int index = strlen(current_time);
-		current_time[index-1] = '\0';
-		printf("value @ %s : ",current_time);
-		printf("%s", buffer);
-		write_data_to_file(fp,buffer,current_time,counter);
+		time_t timer;
+		char* time_buffer = (char*)calloc(32, sizeof(char));
+		struct tm* tm_info;
+
+		timer = time(NULL);
+		tm_info = localtime(&timer);
+
+		//Time Format : YYYY-MM-DD, HH:MM
+		strftime(time_buffer, 26 , "%Y-%m-%d, %H:%M \0",tm_info);
+		printf("%s", time_buffer);
+
+		//We require only the first value before comma in conductivity.
+		if(type == 'c'){
+			int loop;
+			for(loop = 0; loop < strlen(buffer); loop++){
+				if(buffer[loop] == ','){
+					buffer[loop] = '\0';
+					break;
+				}
+			}
+		}
+
+		printf(" : %s", buffer);
+		write_data_to_file(fp,buffer,time_buffer,counter);
 		printf("\n");
 	}
 }
@@ -185,11 +198,12 @@ static void display_write_to_file(char* buffer, FILE* fp, int counter){
  * puts it in the buffer. It then display the value and writes it to a file. 
  */
 static void *read_write(void *arguments){
+	//Put the arguments in the new struct.
 	struct read_write_arg *data = arguments;
 	write_data(data->channel);
 	delay(800);
 	read_data(data->channel, data->buffer);
-	display_write_to_file(data->buffer, data->fp, data->counter);
+	display_write_to_file(data->buffer, data->fp, data->counter,data->type);
 }
 
 
@@ -197,6 +211,7 @@ static void *read_write(void *arguments){
  * Used to get a keyboard interaction.
  * Returns a 1 if keyboard interaction is true i.e. 1 else returns a false i.e. 0.
  * Used to exit out the loop while calibration process.
+ * Link : https://cboard.cprogramming.com/c-programming/63166-kbhit-linux.html
  */
 static int kbhit(void){
 	struct termios oldt, newt;
@@ -226,6 +241,7 @@ static int kbhit(void){
 
 /*
  * Used to clear sensor of previous calibration.
+ * Important to clear the sensor of the previous calibration in order to ensure the new calibration is effective.
  */
 static void clear_sensor(int channel){
 	char clear_data[] = "cal,clear";
@@ -239,8 +255,9 @@ static void clear_sensor(int channel){
  */
 static void mid_calibration_ph(int channel){
 	printf(" Performing Midpoint Calibration for ph \n Please use 7.00 ph for calibration. \n Press enter when you are ready. \n Press enter again on seeing a stable reading to calibrate.\n");
-	char dummy;
-	dummy = getchar();
+	//char dummy;
+	//dummy = 
+	getchar();
 	while(!kbhit()){
 		write_data(channel);
 		delay(800);
@@ -390,15 +407,33 @@ static void calibration_c(int channel){
 }
 
 
-int main(){
-	//File handler that will be used to read data and write command to the atlas sensor.
+/*
+ * Used to check the value read by the sensors.
+ * Does not store the data or write to file.
+ *
+ */
+void dry_run(int channel){
+	char *buffer = (char*)calloc(32, sizeof(char));
+	while(!kbhit()){
+		write_data(channel);
+		delay(1000);
+		read(channel, buffer, 32);
+		printf("%s\n", buffer);
+	}
+	getchar();
+}
 
+
+int main(){
+
+	//File handler that will be used to read data and write command to the atlas sensor.
 	int channel0_ph1 = set_I2C_channel_0(Addr_ph_1);
 	int channel0_ph2 = set_I2C_channel_0(Addr_ph_2);
 	int channel0_ph3 = set_I2C_channel_0(Addr_ph_3);
 	int channel1_c1 = set_I2C_channel_1(Addr_c_1);
 	int channel1_c2 = set_I2C_channel_1(Addr_c_2);
 	int channel1_c3 = set_I2C_channel_1(Addr_c_3);
+
 	//If channel 0 or channel 1 is -ve then there is an issue with the connection or you are not running as root (Use sudo before execution
 	//of the executable).
 	if(channel0_ph1 < 0 || channel0_ph2 < 0 || channel0_ph3 < 0){
@@ -410,173 +445,294 @@ int main(){
 		printf("error : failed connection with the I2C channel 1. \n");
 	}
 
-	//Perform the check for calibration.
-	char dummy;
-	printf("Do you want to perform calibration of all sensors? \n Press y for Yes or n for No.\n Then press Enter\n");
-	scanf(" %c",&dummy);
-	getchar();
-	printf("\n");
-	if(dummy == 'y' || dummy == 'Y'){
-		printf("****** Calibration for ph sensor 1****** \n");
-		calibration_ph(channel0_ph1);
-		printf("****** Calibration for ph sensor 2****** \n");
-		calibration_ph(channel0_ph2);
-		printf("****** Calibration for ph sensor 3****** \n");
-		calibration_ph(channel0_ph3);
-		printf("****** Calibration for conductivity sensor 1 ******\n");
-		calibration_c(channel1_c1);
-		printf("****** Calibration for conductivity sensor 2 ******\n");
-		calibration_c(channel1_c2);
-		printf("****** Calibration for conductivity sensor 3 ******\n");
-		calibration_c(channel1_c3);
+	int option;
+
+	//Print the selection menu until th euser presses 0.
+	do{
+
+		//Display the options.
+		printf("Select one of the the following option : \n");
+		printf("0. Exit. \n");
+		printf("1. Calibration of all sensors. \n");
+		printf("2. Calibration of one particular sensor. \n");
+		printf("3. Dry run to see values on each sensors. No Data Recording. \n");
+		printf("4. Start Data Collection. \n");
+
+		//Get the user input.
+		scanf("%d",&option);
+		getchar();
+
+		//Select the right option to user's input.
+		switch (option){
+			case 0:
+
+					//Exit case. Break and exit the program.
+					break;
+
+			case 1:
+
+					//Calibrate all sensors case. Perform calibration on all sensors one by one.
+					printf("Do you want to perform calibration of all sensors? \n Press y for Yes or n for No.\n Then press Enter\n");
+					char dummy;
+
+					//Get the user input.
+					scanf(" %c",&dummy);
+					getchar();
+					printf("\n");
+					if(dummy == 'y' || dummy == 'Y'){
+						printf("****** Calibration for ph sensor 1****** \n");
+						calibration_ph(channel0_ph1);
+						printf("****** Calibration for ph sensor 2****** \n");
+						calibration_ph(channel0_ph2);
+						printf("****** Calibration for ph sensor 3****** \n");
+						calibration_ph(channel0_ph3);
+						printf("****** Calibration for conductivity sensor 1 ******\n");
+						calibration_c(channel1_c1);
+						printf("****** Calibration for conductivity sensor 2 ******\n");
+						calibration_c(channel1_c2);
+						printf("****** Calibration for conductivity sensor 3 ******\n");
+						calibration_c(channel1_c3);
+					}
+					break;
+
+			case 2:
+
+					//Calibrate one sensor case. Perform calibration on only one sensor.
+					printf("\n");
+
+					//Display the options.
+					printf("Select one of the the following sensor to calibrate : \n");
+					printf("1. Calibrate ph sensor 1. \n");
+					printf("2. Calibrate ph sensor 2. \n");
+					printf("3. Calibrate ph sensor 3. \n");
+					printf("4. Calibrate conductivity sensor 1. \n");
+					printf("5. Calibrate conductivity sensor 2. \n");
+					printf("6. Calibrate conductivity sesnor 3. \n");
+					int cal_option;
+
+					//Get the user input.
+					scanf("%d",&cal_option);
+					getchar();
+					switch(cal_option){
+						case 1:
+								//Calibrate ph sensor 1.
+								printf("****** Calibration for ph sensor 1****** \n");
+								calibration_ph(channel0_ph1);
+								break;
+						case 2:
+								//Calibrate ph sensor 2.
+								printf("****** Calibration for ph sensor 2****** \n");
+								calibration_ph(channel0_ph2);
+								break;
+						case 3:
+								//Calibrate ph sensor 3.
+								printf("****** Calibration for ph sensor 3****** \n");
+								calibration_ph(channel0_ph3);
+								break;
+						case 4:
+								//Calibrate conductivity sensor 1.
+								printf("****** Calibration for conductivity sensor 1 ******\n");
+								calibration_c(channel1_c1);
+								break;
+						case 5:
+								//Calibrate conductivity sensor 2.
+								printf("****** Calibration for conductivity sensor 2 ******\n");
+								calibration_c(channel1_c2);
+								break;
+						case 6:
+								//Calibrate conductivity sensor 3.
+								printf("****** Calibration for conductivity sensor 3 ******\n");
+								calibration_c(channel1_c3);
+					}
+					break;
+
+			case 3:
+					//Dry Run Case. Display the value read by the sesnor. Don't record the data.
+					//Display the sensors option.
+					printf("Select one of the the following sensor to dry run : \n");
+					printf("1. ph sensor 1. \n");
+					printf("2. ph sensor 2. \n");
+					printf("3. ph sensor 3. \n");
+					printf("4. conductivity sensor 1. \n");
+					printf("5. conductivity sensor 2. \n");
+					printf("6. conductivity sesnor 3. \n");
+					int dry_option;
+
+					//Get the user input.
+					scanf("%d",&dry_option);
+					getchar();
+					switch(dry_option){
+						case 1:
+								//Dry run ph sensor 1.
+								printf("****** Dry run for ph sensor 1****** \n");
+								dry_run(channel0_ph1);
+								break;
+						case 2:
+								//Calibrate ph sensor 2.
+								printf("****** Dry run for ph sensor 2****** \n");
+								dry_run(channel0_ph2);
+								break;
+						case 3:
+								//Calibrate ph sensor 3.
+								printf("****** Dry run for ph sensor 3****** \n");
+								dry_run(channel0_ph3);
+								break;
+						case 4:
+								//Calibrate conductivity sensor 1.
+								printf("****** Dry run for conductivity sensor 1 ******\n");
+								dry_run(channel1_c1);
+								break;
+						case 5:
+								//Calibrate conductivity sensor 2.
+								printf("****** Dry run for conductivity sensor 2 ******\n");
+								dry_run(channel1_c2);
+								break;
+						case 6:
+								//Calibrate conductivity sensor 1.
+								printf("****** Dry run for conductivity sensor 3 ******\n");
+								dry_run(channel1_c3);
+					}
+					break;
+
+			case 4:
+					//Data Collection Case. Start data collection. 
+					printf("\nPress Enter to start data collection. \n");
+					while(!kbhit()){
+					}
+
+					getchar();
+					printf("Creating buffer for data input\n");
+
+					//Create pointer to the buffer that will hold the data returned from the atlas sensor. 
+					char *buffer_ph;
+					char *buffer_c;
+
+					buffer_ph = (char*)calloc(32, sizeof(char));
+					buffer_c = (char*)calloc(32, sizeof(char));
+
+					//dummy variable
+					unsigned char read1 = 0x90;
+
+
+					//Create pointer for the file that will be used to write the data.
+					FILE* fp_ph;
+					FILE* fp_c;
+
+					//Try to create a file with write permission to store ph values.
+					char ph_str[] = "data_ph.csv";
+					char c_str[] = "data_c.csv";
+
+
+					//Try to create a file and open it.
+					fp_ph = fopen(ph_str,"a");
+
+					if(fp_ph == NULL){
+						printf("Couldn't open file ph\n");
+						return;
+					}
+
+					//Try to create a file and open it.
+					fp_c = fopen(c_str,"a");
+
+					if(fp_c == NULL){
+						printf("Couldn't open file c\n");
+						return;
+					}
+
+					//Create threads used to multithread.
+					pthread_t thread_ph;
+					pthread_t thread_c;
+
+					//Create the structure to pass the data for ph in multithreading.
+					struct read_write_arg ph_data;
+					ph_data.buffer = buffer_ph;
+					ph_data.fp = fp_ph;
+					ph_data.type = 'p';
+
+					//Create the structure to pass the data for conductivity in multithreading.
+					struct read_write_arg c_data;
+					c_data.buffer = buffer_c;
+					c_data.fp = fp_c;
+					c_data.type = 'c';
+
+					//Time to keep track of the time for which it records.
+					time_t end_time;
+					time_t start_time = time(NULL);
+
+					//4 hours = 4 * 60 min = 4 * 60 * 60 seconds = 14400 seconds.
+					//4.5 hours = 16200 seconds.
+					//30 min = 30 * 60 = 1800 seconds.
+					//1 hour = 60 * 60 = 3600 seconds.
+					time_t seconds = 14400;
+
+					end_time = start_time + seconds;
+					printf("Data Collection starts at time %s",ctime(&start_time));
+
+					while(start_time < end_time){
+
+						//Reading Pair 1
+						ph_data.channel = channel0_ph1;
+						ph_data.counter = 1;
+						c_data.channel = channel1_c1;
+						c_data.counter = 1;
+
+						//Create the thread and run them.
+						pthread_create(&thread_ph, NULL, &read_write,(void *)&ph_data);
+						pthread_create(&thread_c, NULL, &read_write,(void *)&c_data);
+
+						//Wait for the thread to finish.
+						pthread_join(thread_ph, NULL);
+						pthread_join(thread_c, NULL);
+
+						//Reading Pair 2
+						ph_data.channel = channel0_ph2;
+						ph_data.counter = 2;
+						c_data.channel = channel1_c2;
+						c_data.counter = 2;
+
+						//Create the thread and run them.
+						pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
+						pthread_create(&thread_c, NULL, &read_write, (void *)&c_data);
+
+						//Wait for the thread to finish.
+						pthread_join(thread_ph, NULL);
+						pthread_join(thread_c, NULL);
+
+						//Reading the Pair 3
+						ph_data.channel = channel0_ph3;
+						ph_data.counter = 3;
+						c_data.channel = channel1_c3;
+						c_data.counter = 3;
+
+						//Create the thread and run them.
+						pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
+						pthread_create(&thread_c, NULL, &read_write, (void *)&c_data);
+
+						//Wait for the thread to finish.
+						pthread_join(thread_ph, NULL);
+						pthread_join(thread_c, NULL);
+
+						printf("\n");
+						//Delay between the readings
+						delay(del);
+
+						//Update the time.
+						start_time = time(NULL);
+
+					}
+
+					printf("Data collection ends at time %s",ctime(&start_time));
+
+					//Data Backup
+					printf("Performing Data Backup in DropBox. \n");
+					system("sudo bash /home/pi/Dropbox-Uploader/dropbox_uploader.sh upload /home/pi/Desktop/h2o/ /");
+					break;
+
+			default:
+					printf("Invalid option.\n");
+		}
 	}
+	while(option != 0);
 
-	printf("\nPress Enter to start data collection. \n");
-	while(!kbhit()){
-	}
-	getchar();
-
-	printf("Creating buffer for data input\n");
-	//Create pointer to the buffer that will hold the data returned from the atlas sensor. 
-	char *buffer_ph;
-	char *buffer_c;
-
-	buffer_ph = (char*)calloc(32, sizeof(char));
-	buffer_c = (char*)calloc(32, sizeof(char));
-
-	//dummy variable
-	unsigned char read1 = 0x90;
-
-	//Variable for loop traversal/
-	int i,j;
-
-	//Create pointer for the file that will be used to write the data.
-	FILE* fp_ph;
-	FILE* fp_c;
-
-	//Try to create a file with write permission to store ph values.
-	char ph_str[] = "data_ph.csv";
-	char c_str[] = "data_c.csv";
-/*
-	char *temp_time;
-
-	//Add time stamp to file
-	time(&t);
-	temp_time = (char*)calloc(32, sizeof(char));
-	temp_time = ctime(&t);
-	int index = strlen(temp_time);
-	temp_time[index - 1] = '\0';
-
-	//Concatenate the time stamp to string and make a .csv format file.
-	strcat(ph_str, temp_time);
-	strcat(ph_str,".csv");
-*/
-	//Try to create a file and open it.
-	fp_ph = fopen(ph_str,"a");
-
-	if(fp_ph == NULL){
-		printf("Couldn't open file ph\n");
-		return;
-	}
-/*
-	//Add time stamp to file
-	time(&t);
-	temp_time = (char*)calloc(32, sizeof(char));
-	temp_time = ctime(&t);
-	index = strlen(temp_time);
-	temp_time[index - 1] = '\0';
-
-	//Concatenate the time stamp to string and make a .csv format file.
-	strcat(c_str, temp_time);
-	strcat(c_str,".csv");
-*/
-	//Try to create a file and open it.
-	fp_c = fopen(c_str,"a");
-
-	if(fp_c == NULL){
-		printf("Couldn't open file c\n");
-		return;
-	}
-
-	//Create threads used to multithread.
-	pthread_t thread_ph;
-	pthread_t thread_c;
-
-	//Create the structure to pass the data for ph in multithreading.
-	struct read_write_arg ph_data;
-	//ph_data.channel = channel0_ph1;
-	ph_data.buffer = buffer_ph;
-	ph_data.fp = fp_ph;
-
-	//Create the structure to pass the data for conductivity in multithreading.
-	struct read_write_arg c_data;
-	//c_data.channel = channel1_c1;
-	c_data.buffer = buffer_c;
-	c_data.fp = fp_c;
-
-	//Time to keep track of the time for which it records.
-	time_t end_time;
-	time_t start_time = time(NULL);
-	//4 hours = 4 * 60 min = 4 * 60 * 60 seconds = 14400 seconds.
-	time_t seconds= 14400;
-	end_time = start_time + seconds;
-	printf("Data Collection starts at time %s",ctime(&start_time));
-
-	while(start_time < end_time){
-	//Reading Pair 1
-	ph_data.channel = channel0_ph1;
-	ph_data.counter = 1;
-	c_data.channel = channel1_c1;
-	c_data.counter = 1;
-
-	//Create the thread and run them.
-	pthread_create(&thread_ph, NULL, &read_write,(void *)&ph_data);
-	pthread_create(&thread_c, NULL, &read_write,(void *)&c_data);
-
-	//Wait for the thread to finish.
-	pthread_join(thread_ph, NULL);
-	pthread_join(thread_c, NULL);
-
-	//Reading Pair 2
-	ph_data.channel = channel0_ph2;
-	ph_data.counter = 2;
-	c_data.channel = channel1_c2;
-	c_data.counter = 2;
-
-	//Create the thread and run them.
-	pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
-	pthread_create(&thread_c, NULL, &read_write, (void *)&c_data);
-
-	//Wait for the thread to finish.
-	pthread_join(thread_ph, NULL);
-	pthread_join(thread_c, NULL);
-
-	//Reading the Pair 3
-	ph_data.channel = channel0_ph3;
-	ph_data.counter = 3;
-	c_data.channel = channel1_c3;
-	c_data.counter = 3;
-
-	//Create the thread and run them.
-	pthread_create(&thread_ph, NULL, &read_write, (void *)&ph_data);
-	pthread_create(&thread_c, NULL, &read_write, (void *)&c_data);
-
-	//Wait for the thread to finish.
-	pthread_join(thread_ph, NULL);
-	pthread_join(thread_c, NULL);
-
-	printf("\n");
-
-	//Update the time.
-	start_time = time(NULL);
-
-	//Delay between the readings.
-	delay(del);
-
-	}
-	printf("Data collection ends at time %s",ctime(&start_time));
-	//Data Backup
-	printf("Performing Data Backup in DropBox. \n");
-	system("sudo bash /home/pi/Dropbox-Uploader/dropbox_uploader.sh upload /home/pi/Desktop/New/ /");
 return 0;
 }
